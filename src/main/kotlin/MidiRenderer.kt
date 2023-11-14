@@ -1,21 +1,36 @@
 import org.openrndr.application
 import org.openrndr.color.ColorRGBa
+import org.openrndr.draw.Filter
 import org.openrndr.draw.isolatedWithTarget
 import org.openrndr.draw.renderTarget
-import org.openrndr.extra.midi.MidiDeviceDescription
-import org.openrndr.extra.midi.MidiEvent
-import org.openrndr.extra.midi.MidiEventType
-import org.openrndr.extra.midi.MidiTransceiver
+import org.openrndr.extra.compositor.compose
+import org.openrndr.extra.compositor.draw
+import org.openrndr.extra.compositor.layer
+import org.openrndr.extra.compositor.post
+import org.openrndr.extra.fx.blur.GaussianBlur
+import org.openrndr.extra.fx.blur.LaserBlur
+import org.openrndr.extra.fx.dither.ADither
+import org.openrndr.extra.fx.grain.FilmGrain
+import org.openrndr.extra.midi.*
 import org.openrndr.extra.noclear.NoClear
 import org.openrndr.extra.noise.Random.vector2
+import org.openrndr.extra.noise.cubic
+import org.openrndr.extra.noise.perlin
+import org.openrndr.extra.noise.simplex
 import org.openrndr.extra.olive.oliveProgram
+import org.openrndr.math.Polar
 import org.openrndr.math.Vector2
 import org.openrndr.math.map
+import org.openrndr.shape.Rectangle
 import org.openrndr.shape.Segment
 import visualizers.AmazingMidiVisualizer
 import visualizers.OtherMidiVisualizer
+import visualizers.PsychedelicEyeMidiVisualizer
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import kotlin.math.atan
 import kotlin.math.sin
+import kotlin.math.tan
 
 data class MidiEventWrapper(val event: MidiEvent, val startTime: Long)
 
@@ -45,35 +60,29 @@ fun main() {
 
             val renderTarget = renderTarget(width, height) {
                 colorBuffer()
-                depthBuffer()
+//                depthBuffer()
             }
             // Initialize MIDI
             MidiDeviceDescription.list().forEach {
                 println(it)
             }
-            val midiQueue = LinkedList<MidiEventWrapper>()
-            val amazingMidiVisualizer = AmazingMidiVisualizer(drawer)
+            val midiQueue = ConcurrentLinkedQueue<MidiEventWrapper>()
+//            val amazingMidiVisualizer = AmazingMidiVisualizer(drawer)
             val otherMidiVisualizer = OtherMidiVisualizer(drawer)
             try {
 
-                val midi = MidiTransceiver.fromDeviceVendor(program, "TD-17", "Roland")
-//            val midi = MidiTransceiver.fromDeviceVendor(program,"Session 2", "Unknown vendor")
+                val midi = MidiTransceiver.fromDeviceVendor(this, "TD-17", "Roland")
+//                val midi = MidiTransceiver.fromDeviceVendor(program, "Session 2", "Unknown vendor")
 //                val midi = MidiTransceiver.fromDeviceVendor(program, "drum", "Apple Inc.")
                 midi.noteOn.listen {
-                    val note = it.note
-                    println("note on: channel: ${it.channel}, key: $note, velocity: ${it.velocity}")
                     midiQueue.add(MidiEventWrapper(it, System.currentTimeMillis()))
                 }
             } catch (e: Exception) {
                 println(e)
             }
 
-
-            val fadeOutDuration = 500L //  Fade out duration in milliseconds
-
             keyboard.keyDown.listen {
                 // mimic sending midi events by pressing buttons on the keyboard
-                println(it.key)
                 val event = MidiEvent(MidiEventType.NOTE_ON)
                 if (keyBoardMappings.containsKey(it.key)) {
                     event.note = keyBoardMappings.getValue(it.key)
@@ -86,36 +95,22 @@ fun main() {
                 }
             }
 
-//        extend(Screenshots())
-
+//            extend(Screenshots())
+//            extend(MidiConsole())
 //            extend(NoClear())
             extend {
                 val currentTime = System.currentTimeMillis()
-
-                val eventsToRemove = mutableSetOf<MidiEventWrapper>()
-
-                midiQueue.reversed().forEach { midi ->
+                midiQueue.removeIf { midi ->
                     val elapsedTime = currentTime - midi.startTime
-                    if (elapsedTime < fadeOutDuration) {
-//                        drawer.image(amazingMidiVisualizer.draw(midi, seconds, elapsedTime).colorBuffer(0))
+                    if (elapsedTime < ttl) {
                         drawer.image(otherMidiVisualizer.draw(midi, seconds, elapsedTime).colorBuffer(0))
 
-                        eventsToRemove.add(midi)
+                        false
+                    } else {
+                        true
                     }
                 }
-
-                // Remove completed events from the queue
-                midiQueue.removeAll(eventsToRemove)
-//                val averageSnare = midiQueue
-//                    .filter { TD17.getDrum(it.event.note) == TD17Drum.SNARE }
-//                    .zipWithNext { a, b -> b.startTime - a.startTime }
-//                    .average()
-
-//                println(averageSnare)
-
             }
         }
     }
-
-
 }

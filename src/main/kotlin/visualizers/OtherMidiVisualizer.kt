@@ -4,9 +4,15 @@ import MidiEventWrapper
 import org.openrndr.color.ColorHSVa
 import org.openrndr.color.ColorRGBa
 import org.openrndr.draw.*
+import org.openrndr.extra.compositor.compose
+import org.openrndr.extra.compositor.layer
+import org.openrndr.extra.compositor.post
+import org.openrndr.extra.fx.blur.GaussianBlur
+import org.openrndr.extra.fx.blur.LaserBlur
 import org.openrndr.math.Vector2
 import org.openrndr.math.map
 import kotlin.math.sin
+import kotlin.math.tan
 
 class OtherMidiVisualizer(private val drawer: Drawer) :
     MidiVisualizer(drawer) {
@@ -26,25 +32,25 @@ class OtherMidiVisualizer(private val drawer: Drawer) :
     }
 
     override fun draw(midi: MidiEventWrapper, seconds: Double, elapsedTime: Long): RenderTarget {
+        val ttl = map(0.0, 127.0, 500.0, 2000.0, midi.event.velocity.toDouble())
+        val alpha = map(0.0, 1.0, 0.0, 0.6, 1.0 - (elapsedTime.toDouble() / ttl.toDouble()))
 
-        val alpha = map(0.0, 1.0, 0.0, 0.7, 1.0 - (elapsedTime.toDouble() / ttl.toDouble()))
+
         drawer.isolatedWithTarget(renderTarget) {
-            drawer.clear(ColorRGBa.TRANSPARENT)
             drawer.translate(drawer.bounds.center)
-            for (i in 0..midi.event.velocity) {
-                drawer.fill = null
-                drawer.strokeWeight = 0.5
+            drawer.clear(ColorRGBa.TRANSPARENT)
+            repeat(midi.event.velocity) {
+                fill = null
+                strokeWeight = 0.5
                 drawer.stroke =
-                    colors[midi.event.note * midi.event.velocity % colors.size].opacify(alpha)
+                    colors[midi.event.note % colors.size].opacify(alpha)
                 drawer.rectangle(
-                    Vector2(
-                        sin(seconds * 0.1) * midi.event.note.toDouble(),
-                        sin(seconds * 0.1) * midi.event.note.toDouble()
-                    ),
-                    midi.event.note.toDouble() * 10 * sin(elapsedTime * 0.1),
-                    midi.event.note.toDouble() * 10 * sin(elapsedTime * 0.1)
+                    sin(seconds * 0.05) * midi.event.note.toDouble(),
+                    sin(seconds * 0.05) * midi.event.note.toDouble(),
+                    midi.event.note.toDouble() * 10 * tan(elapsedTime * 0.01),
+                    midi.event.note.toDouble() * 10 * tan(elapsedTime * 0.01)
                 )
-                drawer.rotate(360 / midi.event.velocity.toDouble() * seconds * 0.01)
+                drawer.rotate(seconds * 0.1 * (360 / midi.event.velocity.toDouble()))
             }
         }
         return renderTarget
